@@ -166,33 +166,38 @@ assert(math.fabs(testcorners['ul'][1]-ul[1]+20) < 1e-10)
 assert(math.fabs(testcorners['ul'][2]-ul[2]-30) < 1e-10)
 
 # ----------------- extract joint pixel locations ---------------------- #
-def extractJointsPx(camname, joint_names, getJointCoord, resln_h=512, startFrame=1, endFrame=7800, everyXFrames=2000):
-    camcoord = cmds.camera(camname, position=True, query=True)
-    camrots = cmds.camera(camname, query=True, rotation=True)
-    hangle = cmds.camera(camname, horizontalFieldOfView=True, query=True)
-    vangle = cmds.camera(camname, verticalFieldOfView=True, query=True)
-    # aspect ratio
-    ar = math.tan(math.radians(hangle/2)) / math.tan(math.radians(vangle/2))
-    # resln_h = 512    # in pixels
-    resln_w = ar*resln_h
-    ncp = cmds.camera(camname, nearClipPlane=True, query=True)
-
-    camdir = rotxyz([0,0,-1],camrots)    # camera started out pointing in negative z direction
-    camup  = rotxyz([0,1,0],camrots)    # camera started out standing up
-    # find 4 corners of canvas
-    corners = ncpCorners(ncp, hangle, vangle, camdir, camup, camcoord)
-    ul = corners['ul']
-    ur = corners['ur']
-    ll = corners['ll']
-    lr = corners['lr']
-    # startFrame = 1
-    # endFrame = 7800
-    # everyXFrames = 2000
-
+def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000):
     for i in range(startFrame,endFrame+1,everyXFrames):
         # sets frame number
         cmds.currentTime(i)
         print("Frame: %d"%(i))
+        if outfile != '':
+            with open(outfile, 'a+') as file:
+                file.write('%d' % i)
+                file.write('\n')
+        # camera parameters
+        camcoord = cmds.camera(camname, position=True, query=True)
+        camrots = cmds.camera(camname, query=True, rotation=True)
+        hangle = cmds.camera(camname, horizontalFieldOfView=True, query=True)
+        vangle = cmds.camera(camname, verticalFieldOfView=True, query=True)
+        # aspect ratio
+        ar = math.tan(math.radians(hangle/2)) / math.tan(math.radians(vangle/2))
+        image_width = ar*image_height
+        ncp = cmds.camera(camname, nearClipPlane=True, query=True)
+        scale = cmds.camera(camname, cameraScale=True, query=True)
+        if scale != 1:
+            ncp = ncp/scale
+            hangle = 2*math.degrees(math.atan(scale*math.tan(math.radians(hangle/2))))
+            vangle = 2*math.degrees(math.atan(scale*math.tan(math.radians(vangle/2))))
+
+        camdir = rotxyz([0,0,-1],camrots)    # camera started out pointing in negative z direction
+        camup  = rotxyz([0,1,0],camrots)    # camera started out standing up
+        # find 4 corners of canvas
+        corners = ncpCorners(ncp, hangle, vangle, camdir, camup, camcoord)
+        ul = corners['ul']
+        ur = corners['ur']
+        ll = corners['ll']
+        lr = corners['lr']
 
         joints_framei = {}
         for jn in joint_names:
@@ -208,9 +213,13 @@ def extractJointsPx(camname, joint_names, getJointCoord, resln_h=512, startFrame
             ncpXvec = [(ur[0]-ul[0])/ncpWidth,(ur[1]-ul[1])/ncpWidth,(ur[2]-ul[2])/ncpWidth]
             ncpYvec = [(lr[0]-ur[0])/ncpHeight,(lr[1]-ur[1])/ncpHeight,(lr[2]-ur[2])/ncpHeight]
             ncpRayvec = [camcoord[0]+ray[0]-ul[0],camcoord[1]+ray[1]-ul[1],camcoord[2]+ray[2]-ul[2]]
-            px = resln_w*(ncpRayvec[0]*ncpXvec[0]+ncpRayvec[1]*ncpXvec[1]+ncpRayvec[2]*ncpXvec[2])/ncpWidth
-            py = resln_h*(ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
+            px = image_width*(ncpRayvec[0]*ncpXvec[0]+ncpRayvec[1]*ncpXvec[1]+ncpRayvec[2]*ncpXvec[2])/ncpWidth
+            py = image_height*(ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
             print('Joint %s has pixel location x=%d and y=%d'%(jn,int(round(px)),int(round(py))))
+            if outfile != '':
+                with open(outfile, 'a+') as file:
+                    file.write('%s:%d,%d' % (jn,px,py))
+                    file.write('\n')
 
 ## ================= END Utility functions ======================= ##
 
@@ -254,8 +263,9 @@ getJointCoord_anime['tiptoe_right'] = (lambda: cmds.pointPosition('U_Char_0.vtx[
 # getJointCoord['elbow_right'] = (lambda: [0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[0]+cmds.pointPosition('U_Char_0.vtx[3118]')[0]),0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[1]+cmds.pointPosition('U_Char_0.vtx[3118]')[1]),0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[2]+cmds.pointPosition('U_Char_0.vtx[3118]')[2])])
 
 
+
 camname = 'camera2'
 # prints joint pixel locations to console
 # position your camera properly before calling
-# make sure to give the right resln_h (picture height in pixels)
-extractJointsPx(camname, joint_names_anime, getJointCoord_anime, resln_h=512, startFrame=1, endFrame=7800, everyXFrames=2000)
+# make sure to give the right image_height (picture height in pixels)
+extractJointsPx(camname, joint_names_anime, getJointCoord_anime, outfile='C:\Users\Liran\Documents\CPSC535\log.txt', image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000)
