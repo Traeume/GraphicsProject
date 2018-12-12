@@ -166,7 +166,11 @@ assert(math.fabs(testcorners['ul'][1]-ul[1]+20) < 1e-10)
 assert(math.fabs(testcorners['ul'][2]-ul[2]-30) < 1e-10)
 
 # ----------------- extract joint pixel locations ---------------------- #
-def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000):
+def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_height=0, image_width=0, startFrame=0, endFrame=0, everyXFrames=1):
+    if (image_height==0) or (image_width==0):
+        print("Please enter image height and width in pixels")
+        return
+    image_ar = float(image_width) / float(image_height)
     for i in range(startFrame,endFrame+1,everyXFrames):
         # sets frame number
         cmds.currentTime(i)
@@ -182,7 +186,6 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
         vangle = cmds.camera(camname, verticalFieldOfView=True, query=True)
         # aspect ratio
         ar = math.tan(math.radians(hangle/2)) / math.tan(math.radians(vangle/2))
-        image_width = ar*image_height
         ncp = cmds.camera(camname, nearClipPlane=True, query=True)
         scale = cmds.camera(camname, cameraScale=True, query=True)
         if scale != 1:
@@ -199,6 +202,12 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
         ll = corners['ll']
         lr = corners['lr']
 
+        fitResolutionGate = cmds.camera(camname, query=True, filmFit=True)
+        if fitResolutionGate == 'fill':
+            if image_ar <= ar:
+                fitResolutionGate = 'vertical'
+            else:
+                fitResolutionGate = 'horizontal'
         joints_framei = {}
         for jn in joint_names:
             # read world coordinates
@@ -213,8 +222,16 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
             ncpXvec = [(ur[0]-ul[0])/ncpWidth,(ur[1]-ul[1])/ncpWidth,(ur[2]-ul[2])/ncpWidth]
             ncpYvec = [(lr[0]-ur[0])/ncpHeight,(lr[1]-ur[1])/ncpHeight,(lr[2]-ur[2])/ncpHeight]
             ncpRayvec = [camcoord[0]+ray[0]-ul[0],camcoord[1]+ray[1]-ul[1],camcoord[2]+ray[2]-ul[2]]
-            px = image_width*(ncpRayvec[0]*ncpXvec[0]+ncpRayvec[1]*ncpXvec[1]+ncpRayvec[2]*ncpXvec[2])/ncpWidth
-            py = image_height*(ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
+            px = 0
+            py = 0
+            if fitResolutionGate == 'vertical':
+                x_fraction = (ncpRayvec[0]*ncpXvec[0]+ncpRayvec[1]*ncpXvec[1]+ncpRayvec[2]*ncpXvec[2])/ncpWidth
+                px = image_width*(0.5+(x_fraction-0.5)*ar/image_ar)
+                py = image_height*(ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
+            elif fitResolutionGate == 'horizontal':
+                px = image_width*(ncpRayvec[0]*ncpXvec[0]+ncpRayvec[1]*ncpXvec[1]+ncpRayvec[2]*ncpXvec[2])/ncpWidth
+                y_fraction = (ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
+                py = image_height*(0.5+(y_fraction-0.5)*image_ar/ar)
             print('Joint %s has pixel location x=%d and y=%d'%(jn,int(round(px)),int(round(py))))
             if outfile != '':
                 with open(outfile, 'a+') as file:
@@ -268,4 +285,4 @@ camname = 'camera2'
 # prints joint pixel locations to console
 # position your camera properly before calling
 # make sure to give the right image_height (picture height in pixels)
-extractJointsPx(camname, joint_names_anime, getJointCoord_anime, outfile='C:\Users\Liran\Documents\CPSC535\log.txt', image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000)
+extractJointsPx(camname, joint_names_anime, getJointCoord_anime, outfile='C:\Users\Liran\Documents\CPSC535\log.txt', image_width=512, image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000)
