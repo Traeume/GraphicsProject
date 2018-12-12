@@ -1,8 +1,7 @@
 import maya.cmds as cmds
 import math
-
-## ================= Utility functions ========================== ##
-# ----------------- rotate vecter in order xyz ------------------ #
+import json
+import os
 def rotxyz(vec,thetas):
     v = rotx(vec,thetas[0])
     v = roty(v,thetas[1])
@@ -171,14 +170,17 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
         print("Please enter image height and width in pixels")
         return
     image_ar = float(image_width) / float(image_height)
+    dictionary = {}
     for i in range(startFrame,endFrame+1,everyXFrames):
         # sets frame number
         cmds.currentTime(i)
         print("Frame: %d"%(i))
+        frame_num = i
         if outfile != '':
-            with open(outfile, 'a+') as file:
-                file.write('%d' % i)
-                file.write('\n')
+            # with open(outfile, 'a+') as file:
+            #     file.write('%d' % i)
+            #     file.write('\n')
+            print()
         # camera parameters
         camcoord = cmds.camera(camname, position=True, query=True)
         camrots = cmds.camera(camname, query=True, rotation=True)
@@ -211,7 +213,8 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
         joints_framei = {}
         for jn in joint_names:
             # read world coordinates
-            joints_framei[jn] = getJointCoord[jn]()
+            fucn = (lambda: cmds.joint(getJointCoord[jn],position=True,query=True))
+            joints_framei[jn] = fucn()
             ptcoord = joints_framei[jn]
             # 'project' onto nearClipPlane (ncp)
             ray = [ptcoord[0]-camcoord[0], ptcoord[1]-camcoord[1], ptcoord[2]-camcoord[2]]
@@ -233,56 +236,92 @@ def extractJointsPx(camname, joint_names, getJointCoord, outfile='', image_heigh
                 y_fraction = (ncpRayvec[0]*ncpYvec[0]+ncpRayvec[1]*ncpYvec[1]+ncpRayvec[2]*ncpYvec[2])/ncpHeight
                 py = image_height*(0.5+(y_fraction-0.5)*image_ar/ar)
             print('Joint %s has pixel location x=%d and y=%d'%(jn,int(round(px)),int(round(py))))
+            joint_name = jn
+            dictionary[(frame_num, joint_name)] = [int(round(px)),  int(round(py))]
             if outfile != '':
-                with open(outfile, 'a+') as file:
-                    file.write('%s:%d,%d' % (jn,px,py))
-                    file.write('\n')
-
-## ================= END Utility functions ======================= ##
-
-
-
+                # with open(outfile, 'a+') as file:
+                #     file.write('%s:%d,%d' % (jn,px,py))
+                #     file.write('\n')
+                print()
+    return dictionary
 
 ## ================= Model Information ======================= ##
 # see credits.md for model credits
 
 # tda_out_of_the_gravity_miku_v1 by chocofudge98
-joint_names_anime = ['body_upper','neck','head','nose_tip','nose_root','arm_left','elbow_left','wrist_left','thumb_left','arm_right','elbow_right','wrist_right','thumb_right','leg_left','knee_left','ankle_left','tiptoe_left','leg_right','knee_right','ankle_right','tiptoe_right']
+joint_names_anime = ['body_upper','neck','head','arm_left',
+'elbow_left','wrist_left','thumb_left','arm_right','elbow_right','wrist_right',
+'thumb_right','leg_left','knee_left','ankle_left', 'leg_right',
+'knee_right','ankle_right']
+joint_names_model = ['Torso', 'Neck', 'Head', 'LeftArm', 'LeftElbow', 'LeftWrist', 'LeftThumb0M',
+'RightArm', 'RightElbow', 'RightWrist', 'RightThumb0M', 'LeftHip', 'LeftKnee', 'LeftFoot', 'RightHip',
+'RightKnee', 'RightFoot']
+for i in range(len(joint_names_model)):
+    joint_names_model[i] = cmds.ls('*'+joint_names_model[i]+'*')[0]
+
 getJointCoord_anime = {}
-getJointCoord_anime['body_upper'] = (lambda: cmds.joint('No_12_joint_Torso2',position=True,query=True))
-getJointCoord_anime['neck'] = (lambda: cmds.joint('No_18_joint_Neck',position=True,query=True))
-getJointCoord_anime['head'] = (lambda: cmds.joint('No_19_joint_Head',position=True,query=True))
-getJointCoord_anime['nose_tip'] = (lambda: cmds.pointPosition('U_Char_1.vtx[298]'))
-getJointCoord_anime['nose_root'] = (lambda: cmds.pointPosition('U_Char_1.vtx[274]'))
-getJointCoord_anime['arm_left'] = (lambda: cmds.joint('No_61_joint_LeftArm',position=True,query=True))
-getJointCoord_anime['elbow_left'] = (lambda: cmds.joint('No_68_joint_LeftElbow',position=True,query=True))
-getJointCoord_anime['wrist_left'] = (lambda: cmds.joint('No_73_joint_LeftWrist',position=True,query=True))
-getJointCoord_anime['thumb_left'] = (lambda: cmds.joint('No_306_i_joint_LeftThumb0M',position=True,query=True))
-getJointCoord_anime['arm_right'] = (lambda: cmds.joint('No_23_joint_RightArm',position=True,query=True))
-getJointCoord_anime['elbow_right'] = (lambda: cmds.joint('No_30_joint_RightElbow',position=True,query=True))
-getJointCoord_anime['wrist_right'] = (lambda: cmds.joint('No_35_joint_RightWrist',position=True,query=True))
-getJointCoord_anime['thumb_right'] = (lambda: cmds.joint('No_307_i_joint_RightThumb0M',position=True,query=True))
-getJointCoord_anime['leg_left'] = (lambda: cmds.joint('No_106_joint_LeftHip',position=True,query=True))
-getJointCoord_anime['knee_left'] = (lambda: cmds.joint('No_107_joint_LeftKnee',position=True,query=True))
-getJointCoord_anime['ankle_left'] = (lambda: cmds.joint('No_108_joint_LeftFoot',position=True,query=True))
-getJointCoord_anime['tiptoe_left'] = (lambda : cmds.pointPosition('U_Char_0.vtx[29091]'))
-getJointCoord_anime['leg_right'] = (lambda: cmds.joint('No_102_joint_RightHip',position=True,query=True))
-getJointCoord_anime['knee_right'] = (lambda: cmds.joint('No_103_joint_RightKnee',position=True,query=True))
-getJointCoord_anime['ankle_right'] = (lambda: cmds.joint('No_104_joint_RightFoot',position=True,query=True))
-getJointCoord_anime['tiptoe_right'] = (lambda: cmds.pointPosition('U_Char_0.vtx[28428]'))
 
-# joint_names = ['tiptoe_left','tiptoe_right','knee_left','knee_right','elbow_right']
-# getJointCoord = {}
-# getJointCoord['tiptoe_left'] = (lambda : cmds.pointPosition('U_Char_0.vtx[29091]'))
-# getJointCoord['tiptoe_right'] = (lambda: cmds.pointPosition('U_Char_0.vtx[28428]'))
-# getJointCoord['knee_left'] = (lambda: [0.5*(cmds.pointPosition('U_Char_0.vtx[1207]')[0]+cmds.pointPosition('U_Char_0.vtx[1093]')[0]),0.5*(cmds.pointPosition('U_Char_0.vtx[1207]')[1]+cmds.pointPosition('U_Char_0.vtx[1093]')[1]),0.5*(cmds.pointPosition('U_Char_0.vtx[1207]')[2]+cmds.pointPosition('U_Char_0.vtx[1093]')[2])])
-# getJointCoord['knee_right'] = (lambda: [0.5*(cmds.pointPosition('U_Char_0.vtx[2432]')[0]+cmds.pointPosition('U_Char_0.vtx[2474]')[0]),0.5*(cmds.pointPosition('U_Char_0.vtx[2432]')[1]+cmds.pointPosition('U_Char_0.vtx[2474]')[1]),0.5*(cmds.pointPosition('U_Char_0.vtx[2432]')[2]+cmds.pointPosition('U_Char_0.vtx[2474]')[2])])
-# getJointCoord['elbow_right'] = (lambda: [0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[0]+cmds.pointPosition('U_Char_0.vtx[3118]')[0]),0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[1]+cmds.pointPosition('U_Char_0.vtx[3118]')[1]),0.5*(cmds.pointPosition('U_Char_0.vtx[3072]')[2]+cmds.pointPosition('U_Char_0.vtx[3118]')[2])])
+for j in range(len(joint_names_anime)):
+    val = joint_names_model[j]
+    getJointCoord_anime[joint_names_anime[j]] = val
 
-
-
-camname = 'camera2'
+camname = 'persp'
 # prints joint pixel locations to console
 # position your camera properly before calling
-# make sure to give the right image_height (picture height in pixels)
-extractJointsPx(camname, joint_names_anime, getJointCoord_anime, outfile='C:\Users\Liran\Documents\CPSC535\log.txt', image_width=512, image_height=512, startFrame=1, endFrame=7800, everyXFrames=2000)
+# make sure to give the right resln_h (picture height in pixels)
+start_frame = 505
+end_frame = 508
+frame_per_img = 1
+img_height = 512
+img_width = 512
+frame_padding = 4
+dictionary = extractJointsPx(camname, joint_names_anime, getJointCoord_anime, '', 
+image_height=img_height, 
+image_width=img_width, 
+startFrame=start_frame, 
+endFrame=end_frame, 
+everyXFrames=frame_per_img)
+json_list = []
+project_name = 'Miku_Hatsune+Bad_Romance' # file path to the rendered img folder (i.e. model name + vmd name)
+for i in range(start_frame, end_frame+1, frame_per_img):
+    json_obj = {}
+    json_obj['isValidation'] = 0.0
+    json_obj['joint_others'] = {"_ArrayType_": "double", "_ArraySize_": [0, 0], "_ArrayData_": None}
+    json_obj['people_index'] = 1.0
+    json_obj['scale_provided'] = img_height/200.0
+    json_obj['joint_self'] = [0] * 16
+    json_obj['joint_self'][0] = dictionary[(i, 'ankle_right')]
+    json_obj['joint_self'][1] = dictionary[(i, 'knee_right')]
+    json_obj['joint_self'][2] = dictionary[(i, 'leg_right')]
+    json_obj['joint_self'][3] = dictionary[(i, 'leg_left')]
+    json_obj['joint_self'][4] = dictionary[(i, 'knee_left')]
+    json_obj['joint_self'][5] = dictionary[(i, 'ankle_left')]
+    json_obj['joint_self'][6] = [(dictionary[(i, 'leg_right')][0] + dictionary[(i, 'leg_left')][0])/2,
+    (dictionary[(i, 'leg_right')][1] + dictionary[(i, 'leg_left')][1])/2]
+    json_obj['joint_self'][7] = dictionary[(i, 'body_upper')]
+    json_obj['joint_self'][8] = dictionary[(i, 'neck')]
+    json_obj['joint_self'][9] = dictionary[(i, 'head')]
+    json_obj['joint_self'][10] = dictionary[(i, 'wrist_right')]
+    json_obj['joint_self'][11] = dictionary[(i, 'elbow_right')]
+    json_obj['joint_self'][12] = dictionary[(i, 'arm_right')]
+    json_obj['joint_self'][13] = dictionary[(i, 'arm_left')]
+    json_obj['joint_self'][14] = dictionary[(i, 'elbow_left')]
+    json_obj['objpos_other'] = {"_ArrayType_": "double", "_ArraySize_": [0, 0], "_ArrayData_": None}
+    json_obj['img_width'] = img_width
+    json_obj['dataset'] = "Synthetic"
+    json_obj['img_height'] = img_height
+    json_obj['objpos'] = dictionary[(i, 'body_upper')]
+    json_obj['scale_provided_other'] = {"_ArrayType_": "double", "_ArraySize_": [0, 0], "_ArrayData_": None}
+    json_obj['annolist_index'] = 0.0
+    if len(str(i)) < frame_padding:
+        json_obj['img_paths'] = project_name + '0' + str(i) +'.jpeg'
+    else:
+        json_obj['img_paths'] = project_name + str(i) +'.jpeg'
+    json_obj['numOtherPeople'] = 0.0
+    json_list.append(json_obj)
+
+out_path = os.path.abspath('C:/Users/yhyma/Desktop/535 Synthetic/' + project_name + '.json')
+
+with open( out_path, 'w') as outfile:
+    json.dump(json_list, outfile)
+
