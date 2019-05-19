@@ -1,5 +1,4 @@
 # GraphicsProject
-Work in progress ...
 
 A project that trains a CNN to predict joint locations.
 
